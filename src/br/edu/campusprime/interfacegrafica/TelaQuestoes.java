@@ -20,11 +20,15 @@ public class TelaQuestoes extends JFrame {
     private static final Color PAINEL = new Color(21, 51, 66);
     private static final Color AZUL = new Color(56, 189, 248);
     private static final Color VERDE = new Color(45, 212, 191);
+    private static final Color AMARELO = new Color(250, 204, 21);
+    private static final Color VERMELHO = new Color(248, 113, 113);
     private static final Color BRANCO = Color.WHITE;
+    private static final Color CAMPO = new Color(240, 245, 248);
 
     private final ProvaRepositorio repositorio = new ProvaRepositorio();
 
     private final JComboBox<Prova> comboProvas = new JComboBox<>();
+
     private final JComboBox<String> comboTipo = new JComboBox<>(
         new String[]{"Múltipla escolha", "Discursiva"}
     );
@@ -34,33 +38,47 @@ public class TelaQuestoes extends JFrame {
     private final JTextField[] alternativas = new JTextField[4];
 
     private final JComboBox<String> comboCorreta = new JComboBox<>(
-        new String[]{"Alternativa A", "Alternativa B",
-                     "Alternativa C", "Alternativa D"}
+        new String[]{
+            "Alternativa A", "Alternativa B",
+            "Alternativa C", "Alternativa D"
+        }
     );
 
     private final JTextField campoRespostaEsperada = new JTextField();
+
     private final DefaultListModel<String> modeloQuestoes =
         new DefaultListModel<>();
-    private final JList<String> listaQuestoes = new JList<>(modeloQuestoes);
+
+    private final JList<String> listaQuestoes =
+        new JList<>(modeloQuestoes);
 
     private final JPanel painelAlternativas = new JPanel();
     private final JPanel painelDiscursiva = new JPanel();
+    private final JPanel painelTipos = new JPanel(new CardLayout());
+
+    private final JButton botaoSalvar = new JButton();
+    private final JButton botaoCancelar = new JButton("Cancelar edição");
 
     private List<Prova> provas = new ArrayList<>();
+    private int indiceEmEdicao = -1;
 
     public TelaQuestoes() {
-        setTitle("CampusPrime | Questões");
-        setSize(900, 750);
-        setMinimumSize(new Dimension(750, 650));
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setTitle("CampusPrime | Cadastro de Questões");
+        setSize(1000, 800);
+        setMinimumSize(new Dimension(800, 650));
         setLocationRelativeTo(null);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         criarInterface();
-        carregarProvas();
 
-        comboProvas.addActionListener(e -> atualizarListaQuestoes());
+        comboProvas.addActionListener(e -> {
+            cancelarEdicao();
+            atualizarListaQuestoes();
+        });
+
         comboTipo.addActionListener(e -> atualizarTipoQuestao());
 
+        carregarProvas();
         atualizarTipoQuestao();
     }
 
@@ -74,8 +92,9 @@ public class TelaQuestoes extends JFrame {
         titulo.setForeground(AZUL);
 
         JLabel subtitulo = new JLabel(
-            "Adicione questões às avaliações cadastradas"
+            "Cadastre, edite e organize as questões das suas provas."
         );
+        subtitulo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         subtitulo.setForeground(BRANCO);
 
         JPanel cabecalho = new JPanel();
@@ -88,19 +107,121 @@ public class TelaQuestoes extends JFrame {
         JPanel formulario = new JPanel();
         formulario.setLayout(new BoxLayout(formulario, BoxLayout.Y_AXIS));
         formulario.setBackground(PAINEL);
-        formulario.setBorder(new EmptyBorder(15, 15, 15, 15));
+        formulario.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(40, 75, 90)),
+            new EmptyBorder(15, 15, 15, 15)
+        ));
 
-        campoEnunciado.setBackground(new Color(240, 245, 248));
+        campoEnunciado.setBackground(CAMPO);
         campoEnunciado.setForeground(FUNDO);
-        campoEnunciado.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        campoEnunciado.setCaretColor(FUNDO);
+        campoEnunciado.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         campoEnunciado.setLineWrap(true);
         campoEnunciado.setWrapStyleWord(true);
 
+        configurarCampo(campoValor);
+        configurarCampo(campoRespostaEsperada);
+
+        comboProvas.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        comboTipo.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        comboCorreta.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+
         adicionarCampo(formulario, "Prova:", comboProvas);
         adicionarCampo(formulario, "Tipo de questão:", comboTipo);
-        adicionarCampo(formulario, "Enunciado:", new JScrollPane(campoEnunciado));
+        adicionarCampo(
+            formulario, "Enunciado:", new JScrollPane(campoEnunciado)
+        );
         adicionarCampo(formulario, "Valor da questão:", campoValor);
 
+        criarPainelAlternativas();
+        criarPainelDiscursiva();
+
+        painelTipos.add(painelAlternativas, "MULTIPLA");
+        painelTipos.add(painelDiscursiva, "DISCURSIVA");
+
+        painelTipos.setAlignmentX(Component.LEFT_ALIGNMENT);
+        painelTipos.setBackground(PAINEL);
+        painelTipos.setBorder(new EmptyBorder(0, 0, 5, 0));
+
+        formulario.add(painelTipos);
+
+        botaoSalvar.setText("Cadastrar questão");
+        estilizarBotao(botaoSalvar, VERDE);
+        botaoSalvar.addActionListener(e -> salvarQuestao());
+
+        estilizarBotao(botaoCancelar, AMARELO);
+        botaoCancelar.setVisible(false);
+        botaoCancelar.addActionListener(e -> cancelarEdicao());
+
+        JButton botaoEditar = new JButton("Editar selecionada");
+        estilizarBotao(botaoEditar, AZUL);
+        botaoEditar.addActionListener(e -> iniciarEdicao());
+
+        JButton botaoExcluir = new JButton("Excluir selecionada");
+        estilizarBotao(botaoExcluir, VERMELHO);
+        botaoExcluir.addActionListener(e -> excluirQuestao());
+
+        JPanel botoesFormulario = new JPanel(
+            new FlowLayout(FlowLayout.RIGHT, 8, 5)
+        );
+        botoesFormulario.setOpaque(false);
+        botoesFormulario.add(botaoCancelar);
+        botoesFormulario.add(botaoSalvar);
+        formulario.add(botoesFormulario);
+
+        listaQuestoes.setBackground(PAINEL);
+        listaQuestoes.setForeground(BRANCO);
+        listaQuestoes.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        listaQuestoes.setSelectionBackground(AZUL);
+        listaQuestoes.setSelectionForeground(FUNDO);
+        listaQuestoes.setFixedCellHeight(42);
+
+        JLabel tituloLista = new JLabel("Questões da prova selecionada");
+        tituloLista.setForeground(AZUL);
+        tituloLista.setFont(new Font("Segoe UI", Font.BOLD, 17));
+
+        JPanel painelLista = new JPanel(new BorderLayout(5, 8));
+        painelLista.setOpaque(false);
+        painelLista.add(tituloLista, BorderLayout.NORTH);
+
+        JScrollPane rolagem = new JScrollPane(listaQuestoes);
+        rolagem.setBorder(
+            BorderFactory.createLineBorder(new Color(40, 75, 90))
+        );
+        rolagem.getViewport().setBackground(PAINEL);
+        painelLista.add(rolagem, BorderLayout.CENTER);
+
+        JPanel botoesLista = new JPanel(
+            new FlowLayout(FlowLayout.RIGHT, 8, 5)
+        );
+        botoesLista.setOpaque(false);
+        botoesLista.add(botaoEditar);
+        botoesLista.add(botaoExcluir);
+        painelLista.add(botoesLista, BorderLayout.SOUTH);
+
+        JSplitPane divisao = new JSplitPane(
+            JSplitPane.VERTICAL_SPLIT, formulario, painelLista
+        );
+        divisao.setResizeWeight(0.65);
+        divisao.setDividerLocation(475);
+        divisao.setBorder(null);
+        divisao.setOpaque(false);
+        divisao.setContinuousLayout(true);
+
+        JLabel rodape = new JLabel(
+            "CampusPrime • Gestão de Avaliações Acadêmicas"
+        );
+        rodape.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        rodape.setForeground(new Color(180, 200, 210));
+
+        principal.add(cabecalho, BorderLayout.NORTH);
+        principal.add(divisao, BorderLayout.CENTER);
+        principal.add(rodape, BorderLayout.SOUTH);
+
+        setContentPane(principal);
+    }
+
+    private void criarPainelAlternativas() {
         painelAlternativas.setLayout(
             new BoxLayout(painelAlternativas, BoxLayout.Y_AXIS)
         );
@@ -120,69 +241,21 @@ public class TelaQuestoes extends JFrame {
         }
 
         adicionarCampo(
-            painelAlternativas,
-            "Resposta correta:",
-            comboCorreta
+            painelAlternativas, "Resposta correta:", comboCorreta
         );
+    }
 
+    private void criarPainelDiscursiva() {
         painelDiscursiva.setLayout(
             new BoxLayout(painelDiscursiva, BoxLayout.Y_AXIS)
         );
         painelDiscursiva.setBackground(PAINEL);
 
-        configurarCampo(campoRespostaEsperada);
-
         adicionarCampo(
             painelDiscursiva,
-            "Resposta esperada (para correção):",
+            "Resposta esperada (para auxiliar na correção):",
             campoRespostaEsperada
         );
-
-        JButton botaoSalvar = new JButton("Salvar questão");
-        botaoSalvar.setBackground(VERDE);
-        botaoSalvar.setForeground(FUNDO);
-        botaoSalvar.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        botaoSalvar.setFocusPainted(false);
-        botaoSalvar.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        botaoSalvar.addActionListener(e -> salvarQuestao());
-
-        JPanel painelBotao = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        painelBotao.setOpaque(false);
-        painelBotao.add(botaoSalvar);
-
-        listaQuestoes.setBackground(PAINEL);
-        listaQuestoes.setForeground(BRANCO);
-        listaQuestoes.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        listaQuestoes.setSelectionBackground(AZUL);
-        listaQuestoes.setSelectionForeground(FUNDO);
-
-        JLabel tituloLista = new JLabel("Questões da prova selecionada");
-        tituloLista.setForeground(AZUL);
-        tituloLista.setFont(new Font("Segoe UI", Font.BOLD, 16));
-
-        JPanel painelLista = new JPanel(new BorderLayout(5, 8));
-        painelLista.setOpaque(false);
-        painelLista.add(tituloLista, BorderLayout.NORTH);
-        painelLista.add(
-            new JScrollPane(listaQuestoes),
-            BorderLayout.CENTER
-        );
-
-        JPanel centro = new JPanel(new BorderLayout(15, 15));
-        centro.setOpaque(false);
-        centro.add(formulario, BorderLayout.CENTER);
-        centro.add(painelLista, BorderLayout.SOUTH);
-
-        principal.add(cabecalho, BorderLayout.NORTH);
-        principal.add(centro, BorderLayout.CENTER);
-
-        JPanel rodape = new JPanel(new BorderLayout());
-        rodape.setOpaque(false);
-        rodape.add(painelBotao, BorderLayout.EAST);
-
-        principal.add(rodape, BorderLayout.SOUTH);
-
-        setContentPane(principal);
     }
 
     private void adicionarCampo(
@@ -192,29 +265,52 @@ public class TelaQuestoes extends JFrame {
         label.setForeground(BRANCO);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
-
         componente.setAlignmentX(Component.LEFT_ALIGNMENT);
-        componente.setMaximumSize(
-            new Dimension(Integer.MAX_VALUE, componente instanceof JScrollPane
-                ? 100 : 32)
-        );
+
+        if (componente instanceof JScrollPane) {
+            componente.setPreferredSize(new Dimension(400, 85));
+            componente.setMaximumSize(
+                new Dimension(Integer.MAX_VALUE, 95)
+            );
+        } else {
+            componente.setMaximumSize(
+                new Dimension(Integer.MAX_VALUE, 35)
+            );
+        }
 
         painel.add(label);
         painel.add(Box.createVerticalStrut(4));
         painel.add(componente);
-        painel.add(Box.createVerticalStrut(8));
+        painel.add(Box.createVerticalStrut(7));
     }
 
     private void configurarCampo(JTextField campo) {
-        campo.setBackground(new Color(240, 245, 248));
+        campo.setBackground(CAMPO);
         campo.setForeground(FUNDO);
-        campo.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        campo.setCaretColor(FUNDO);
+        campo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        campo.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 195, 205)),
+            new EmptyBorder(6, 8, 6, 8)
+        ));
+    }
+
+    private void estilizarBotao(JButton botao, Color cor) {
+        botao.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        botao.setBackground(cor);
+        botao.setForeground(FUNDO);
+        botao.setOpaque(true);
+        botao.setContentAreaFilled(true);
+        botao.setUI(new javax.swing.plaf.basic.BasicButtonUI());
+        botao.setFocusPainted(false);
+        botao.setBorderPainted(false);
+        botao.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        botao.setBorder(new EmptyBorder(9, 12, 9, 12));
     }
 
     private void carregarProvas() {
         try {
             provas = repositorio.carregar();
-
             comboProvas.removeAllItems();
 
             for (Prova prova : provas) {
@@ -233,7 +329,8 @@ public class TelaQuestoes extends JFrame {
 
                     if (valor instanceof Prova prova) {
                         setText(
-                            prova.getTitulo() + " — " + prova.getDisciplina()
+                            prova.getTitulo() + " — "
+                                + prova.getDisciplina()
                         );
                     }
 
@@ -246,51 +343,40 @@ public class TelaQuestoes extends JFrame {
             if (provas.isEmpty()) {
                 JOptionPane.showMessageDialog(
                     this,
-                    "Cadastre uma prova antes de adicionar questões.",
-                    "Nenhuma prova encontrada",
+                    "Cadastre uma prova na Tela 01 antes de adicionar questões.",
+                    "Nenhuma prova cadastrada",
                     JOptionPane.INFORMATION_MESSAGE
                 );
             }
-        } catch (IOException | IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(
-                this,
-                "Não foi possível carregar as provas: " + ex.getMessage(),
-                "Erro",
-                JOptionPane.ERROR_MESSAGE
+
+        } catch (IOException | RuntimeException erro) {
+            mostrarErro(
+                "Não foi possível carregar as provas:\n"
+                    + erro.getMessage()
             );
         }
     }
 
     private void atualizarTipoQuestao() {
-        boolean multipla =
-            comboTipo.getSelectedIndex() == 0;
+        CardLayout layout = (CardLayout) painelTipos.getLayout();
 
-        painelAlternativas.setVisible(multipla);
-        painelDiscursiva.setVisible(!multipla);
-
-        // Os campos são adicionados ao formulário principal.
-        // Atualiza a interface após a troca do tipo.
-        Container pai = campoValor.getParent();
-
-        if (pai != null) {
-            pai.revalidate();
-            pai.repaint();
+        if (comboTipo.getSelectedIndex() == 0) {
+            layout.show(painelTipos, "MULTIPLA");
+        } else {
+            layout.show(painelTipos, "DISCURSIVA");
         }
+
+        painelTipos.revalidate();
+        painelTipos.repaint();
     }
 
-    private void salvarQuestao() {
-        Prova prova = (Prova) comboProvas.getSelectedItem();
-
-        if (prova == null) {
-            mostrarErro("Cadastre e selecione uma prova primeiro.");
-            return;
-        }
-
+    private Questao criarQuestaoDoFormulario() {
         String enunciado = campoEnunciado.getText().trim();
 
         if (enunciado.isEmpty()) {
-            mostrarErro("Informe o enunciado da questão.");
-            return;
+            throw new IllegalArgumentException(
+                "Informe o enunciado da questão."
+            );
         }
 
         double valor;
@@ -299,74 +385,191 @@ public class TelaQuestoes extends JFrame {
             valor = Double.parseDouble(
                 campoValor.getText().trim().replace(",", ".")
             );
+        } catch (NumberFormatException erro) {
+            throw new IllegalArgumentException(
+                "Informe um valor numérico válido."
+            );
+        }
 
-            if (!Double.isFinite(valor) || valor <= 0) {
-                mostrarErro("O valor deve ser um número maior que zero.");
-                return;
+        if (!Double.isFinite(valor) || valor <= 0) {
+            throw new IllegalArgumentException(
+                "O valor deve ser maior que zero."
+            );
+        }
+
+        if (comboTipo.getSelectedIndex() == 0) {
+            List<String> opcoes = new ArrayList<>();
+
+            System.out.println("--- Verificação das alternativas ---");
+
+            for (int i = 0; i < alternativas.length; i++) {
+                System.out.println(
+                    "Alternativa " + (i + 1) + ": ["
+                        + alternativas[i].getText() + "]"
+                );
             }
-        } catch (NumberFormatException ex) {
-            mostrarErro("Informe um valor numérico válido.");
+
+            for (JTextField alternativa : alternativas) {
+                String texto = alternativa.getText().trim();
+
+                if (texto.isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "Preencha as quatro alternativas."
+                    );
+                }
+
+                opcoes.add(texto);
+            }
+
+            return new QuestaoMultiplaEscolha(
+                enunciado,
+                valor,
+                opcoes,
+                comboCorreta.getSelectedIndex()
+            );
+        }
+
+        String esperada = campoRespostaEsperada.getText().trim();
+
+        if (esperada.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Informe a resposta esperada."
+            );
+        }
+
+        return new QuestaoDiscursiva(enunciado, valor, esperada);
+    }
+
+    private void salvarQuestao() {
+        Prova prova = (Prova) comboProvas.getSelectedItem();
+
+        if (prova == null) {
+            mostrarAviso("Cadastre e selecione uma prova primeiro.");
             return;
         }
 
+        boolean estavaEditando = indiceEmEdicao >= 0;
+
         try {
-            Questao questao;
+            Questao novaQuestao = criarQuestaoDoFormulario();
 
-            if (comboTipo.getSelectedIndex() == 0) {
-                List<String> opcoes = new ArrayList<>();
-
-                for (JTextField alternativa : alternativas) {
-                    String texto = alternativa.getText().trim();
-
-                    if (texto.isEmpty()) {
-                        mostrarErro("Preencha as quatro alternativas.");
-                        return;
-                    }
-
-                    opcoes.add(texto);
-                }
-
-                questao = new QuestaoMultiplaEscolha(
-                    enunciado,
-                    valor,
-                    opcoes,
-                    comboCorreta.getSelectedIndex()
-                );
+            if (estavaEditando) {
+                prova.substituirQuestao(indiceEmEdicao, novaQuestao);
             } else {
-                String esperada =
-                    campoRespostaEsperada.getText().trim();
-
-                if (esperada.isEmpty()) {
-                    mostrarErro("Informe a resposta esperada.");
-                    return;
-                }
-
-                questao = new QuestaoDiscursiva(
-                    enunciado,
-                    valor,
-                    esperada
-                );
+                prova.adicionarQuestao(novaQuestao);
             }
 
-            prova.adicionarQuestao(questao);
             repositorio.atualizarTodas(provas);
 
             atualizarListaQuestoes();
-            limparCampos();
+            cancelarEdicao();
 
             JOptionPane.showMessageDialog(
                 this,
-                "Questão cadastrada e salva com sucesso!",
+                estavaEditando
+                    ? "Questão atualizada com sucesso!"
+                    : "Questão cadastrada com sucesso!",
                 "CampusPrime",
                 JOptionPane.INFORMATION_MESSAGE
             );
 
-        } catch (IOException | IllegalArgumentException ex) {
+        } catch (IOException | IllegalArgumentException
+                 | IndexOutOfBoundsException erro) {
+            mostrarErro(
+                "Não foi possível salvar a questão:\n"
+                    + erro.getMessage()
+            );
+        }
+    }
+
+    private void iniciarEdicao() {
+        int indice = listaQuestoes.getSelectedIndex();
+        Prova prova = (Prova) comboProvas.getSelectedItem();
+
+        if (prova == null || indice < 0) {
+            mostrarAviso("Selecione uma questão para editar.");
+            return;
+        }
+
+        Questao questao = prova.getQuestoes().get(indice);
+
+        indiceEmEdicao = indice;
+        campoEnunciado.setText(questao.getEnunciado());
+        campoValor.setText(String.valueOf(questao.getValor()));
+
+        if (questao instanceof QuestaoMultiplaEscolha multipla) {
+            comboTipo.setSelectedIndex(0);
+
+            List<String> opcoes = multipla.getAlternativas();
+
+            for (int i = 0; i < alternativas.length; i++) {
+                alternativas[i].setText(
+                    i < opcoes.size() ? opcoes.get(i) : ""
+                );
+            }
+
+            comboCorreta.setSelectedIndex(
+                multipla.getIndiceCorreto()
+            );
+            campoRespostaEsperada.setText("");
+
+        } else if (questao instanceof QuestaoDiscursiva discursiva) {
+            comboTipo.setSelectedIndex(1);
+
+            for (JTextField alternativa : alternativas) {
+                alternativa.setText("");
+            }
+
+            campoRespostaEsperada.setText(
+                discursiva.getRespostaEsperada()
+            );
+        }
+
+        atualizarTipoQuestao();
+        botaoSalvar.setText("Salvar alterações");
+        botaoCancelar.setVisible(true);
+        campoEnunciado.requestFocus();
+    }
+
+    private void excluirQuestao() {
+        int indice = listaQuestoes.getSelectedIndex();
+        Prova prova = (Prova) comboProvas.getSelectedItem();
+
+        if (prova == null || indice < 0) {
+            mostrarAviso("Selecione uma questão para excluir.");
+            return;
+        }
+
+        int confirmacao = JOptionPane.showConfirmDialog(
+            this,
+            "Deseja realmente excluir a questão selecionada?",
+            "Confirmar exclusão",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        );
+
+        if (confirmacao != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            prova.removerQuestao(indice);
+            repositorio.atualizarTodas(provas);
+
+            cancelarEdicao();
+            atualizarListaQuestoes();
+
             JOptionPane.showMessageDialog(
                 this,
-                "Não foi possível salvar a questão: " + ex.getMessage(),
-                "Erro",
-                JOptionPane.ERROR_MESSAGE
+                "Questão excluída com sucesso.",
+                "CampusPrime",
+                JOptionPane.INFORMATION_MESSAGE
+            );
+
+        } catch (IOException | IndexOutOfBoundsException erro) {
+            mostrarErro(
+                "Não foi possível excluir a questão:\n"
+                    + erro.getMessage()
             );
         }
     }
@@ -384,19 +587,23 @@ public class TelaQuestoes extends JFrame {
 
         for (Questao questao : prova.getQuestoes()) {
             String tipo = questao instanceof QuestaoMultiplaEscolha
-                ? "Múltipla escolha" : "Discursiva";
+                ? "Múltipla escolha"
+                : "Discursiva";
 
             modeloQuestoes.addElement(
                 numero + ". [" + tipo + "] "
                     + questao.getEnunciado()
-                    + " — " + questao.getValor() + " ponto(s)"
+                    + " — "
+                    + String.format("%.2f", questao.getValor())
+                    + " ponto(s)"
             );
 
             numero++;
         }
     }
 
-    private void limparCampos() {
+    private void cancelarEdicao() {
+        indiceEmEdicao = -1;
         campoEnunciado.setText("");
         campoValor.setText("");
 
@@ -406,15 +613,25 @@ public class TelaQuestoes extends JFrame {
 
         campoRespostaEsperada.setText("");
         comboCorreta.setSelectedIndex(0);
-        campoEnunciado.requestFocus();
+        comboTipo.setSelectedIndex(0);
+
+        botaoSalvar.setText("Cadastrar questão");
+        botaoCancelar.setVisible(false);
+
+        atualizarTipoQuestao();
+    }
+
+    private void mostrarAviso(String mensagem) {
+        JOptionPane.showMessageDialog(
+            this, mensagem, "Atenção",
+            JOptionPane.WARNING_MESSAGE
+        );
     }
 
     private void mostrarErro(String mensagem) {
         JOptionPane.showMessageDialog(
-            this,
-            mensagem,
-            "Verifique os dados",
-            JOptionPane.WARNING_MESSAGE
+            this, mensagem, "Erro",
+            JOptionPane.ERROR_MESSAGE
         );
     }
 }

@@ -1,0 +1,13 @@
+[
+  {
+    "aluno": "eaafa",
+    "turma": "asfadfdsa",
+    "prova": "Historia Do Brasil",
+    "disciplina": "Historia",
+    "dataHora": "22/10/2026 04:23:31",
+    "notaFinal": 1.0,
+    "valorTotal": 1.0,
+    "respostas": ["0"],
+    "notasDiscursivas": [null]
+  }
+]

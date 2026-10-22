@@ -1,3 +1,4 @@
+
 package br.edu.campusprime.modelo;
 
 import java.util.ArrayList;
@@ -54,6 +55,32 @@ public class Prova {
         questoes.add(questao);
     }
 
+    public void substituirQuestao(int indice, Questao novaQuestao) {
+        if (novaQuestao == null) {
+            throw new IllegalArgumentException(
+                "A nova questão não pode ser nula."
+            );
+        }
+
+        if (indice < 0 || indice >= questoes.size()) {
+            throw new IndexOutOfBoundsException(
+                "A questão selecionada não existe."
+            );
+        }
+
+        questoes.set(indice, novaQuestao);
+    }
+
+    public void removerQuestao(int indice) {
+        if (indice < 0 || indice >= questoes.size()) {
+            throw new IndexOutOfBoundsException(
+                "A questão selecionada não existe."
+            );
+        }
+
+        questoes.remove(indice);
+    }
+
     public int contarQuestoes() {
         return questoes.size();
     }
@@ -74,8 +101,8 @@ public class Prova {
 
     public String gerarResumo() {
         return "Prova: " + titulo
-                + "\nDisciplina: " + disciplina
-                + "\nQuantidade de questões: " + contarQuestoes()
-                + "\nValor total: " + calcularValorTotal();
+            + "\nDisciplina: " + disciplina
+            + "\nQuantidade de questões: " + contarQuestoes()
+            + "\nValor total: " + calcularValorTotal();
     }
 }
